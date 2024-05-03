@@ -341,7 +341,7 @@ class DBOrder extends DBStorage implements OrderInterface
         return [];
     }
 
-    public function clean(): bool
+    public function clean(): array
     {
         if (empty($this->draft)) {
             $this->initDraft();

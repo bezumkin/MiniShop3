@@ -128,7 +128,7 @@ class Order implements OrderInterface
      *
      * @param int $delivery_id
      *
-     * @return array|string
+     * @return array
      */
     public function getDeliveryRequiresFields(int $delivery_id = 0): array
     {
@@ -152,9 +152,9 @@ class Order implements OrderInterface
         return [];
     }
 
-    public function clean(): bool
+    public function clean(): array
     {
-        return true;
+        return $this->storage->clean();
     }
 
     /**

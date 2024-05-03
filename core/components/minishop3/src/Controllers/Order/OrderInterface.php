@@ -72,7 +72,7 @@ interface OrderInterface
      *
      * @return boolean
      */
-    public function clean(): bool;
+    public function clean(): array;
 
     /**
      * Returns the cost of delivery depending on its settings and the goods in a cart
