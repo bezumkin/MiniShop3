@@ -17,15 +17,15 @@ ms3.order = {
       const formData = new FormData()
       formData.append('key', input.name)
       formData.append('value', input.value)
-      const response = await ms3.order.add(formData)
-      if (response.success === true) {
+      const { success, data, message } = await ms3.order.add(formData)
+      if (success === true) {
         parent.classList.add('was-validated')
         // TODO не менять radio, checkbox, select
-        input.value = response.data[input.name]
+        input.value = data[input.name]
       } else {
         parent.classList.add('was-validated')
         input.classList.add('is-invalid')
-        parent.querySelector('.invalid-feedback').textContent = response.message
+        parent.querySelector('.invalid-feedback').textContent = message
       }
     })
   },

@@ -20,14 +20,14 @@ ms3.customer = {
       formData.append('key', input.name)
       formData.append('value', input.value)
 
-      const response = await ms3.customer.add(formData)
+      const { success, data, message } = await ms3.customer.add(formData)
 
-      if (response.success === true) {
-        input.value = response.data[input.name]
+      if (success === true) {
+        input.value = data[input.name]
       } else {
         form.classList.add('was-validated')
         input.classList.add('is-invalid')
-        input.closest('div').querySelector('.invalid-feedback').textContent = response.message
+        input.closest('div').querySelector('.invalid-feedback').textContent = message
       }
     })
   },
