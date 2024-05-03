@@ -222,9 +222,9 @@ class DBOrder extends DBStorage implements OrderInterface
         ];
 
         if (!empty($this->order['delivery_id']) && empty($this->deliverValidationRules)) {
-            $response = $this->getDeliverValidationRules($this->order['delivery_id']);
-            if (!empty($response)) {
-                $this->deliverValidationRules = $response;
+            $response = $this->getDeliveryValidationRules($this->order['delivery_id']);
+            if (!empty($response['success'])) {
+                $this->deliverValidationRules = $response['validation_rules'];
                 $this->validationRules = array_merge($this->validationRules, $this->deliverValidationRules);
             }
         }
@@ -380,6 +380,45 @@ class DBOrder extends DBStorage implements OrderInterface
         return $this->success('ms3_order_clean_success');
     }
 
+    /**
+     * Returns the validation rules for delivery
+     *
+     * @param integer $delivery_id
+     * @return array
+     */
+    public function getDeliveryValidationRules(int $delivery_id): array
+    {
+        if (empty($delivery_id)) {
+            if (empty($this->order)) {
+                $response = $this->get();
+                if ($response['success']) {
+                    $this->order = $response['data']['order'];
+                }
+            }
+            $delivery_id = $this->order['delivery_id'];
+        }
+        if (empty($delivery_id)) {
+            return $this->error('ms3_order_delivery_id_nf');
+        }
+        $q = $this->modx->newQuery(msDelivery::class);
+        $q->where([
+            'id' => $delivery_id,
+            'active' => 1
+        ]);
+        $q->select('validation_rules');
+        $q->prepare();
+        $q->stmt->execute();
+        $rules = $q->stmt->fetch(\PDO::FETCH_COLUMN);
+        if (empty($rules)) {
+            return [];
+        }
+        $rules = json_decode($rules, true);
+        if (!is_array($rules)) {
+            return [];
+        }
+        return $this->success('', ['validation_rules' => $rules]);
+    }
+
     protected function getOrder()
     {
         $Address = $this->draft->getOne('Address');
@@ -402,27 +441,6 @@ class DBOrder extends DBStorage implements OrderInterface
         $this->draft->set('delivery_cost', $delivery_cost);
         $this->draft->set('cost', $cost);
         $this->draft->save();
-    }
-
-    protected function getDeliverValidationRules($delivery_id)
-    {
-        $q = $this->modx->newQuery(msDelivery::class);
-        $q->where([
-            'id' => $delivery_id,
-            'active' => 1
-        ]);
-        $q->select('validation_rules');
-        $q->prepare();
-        $q->stmt->execute();
-        $rules = $q->stmt->fetch(\PDO::FETCH_COLUMN);
-        if (empty($rules)) {
-            return [];
-        }
-        $rules = json_decode($rules, true);
-        if (!is_array($rules)) {
-            return [];
-        }
-        return $rules;
     }
 
     protected function updateDraft(string $key, mixed $value = null): bool

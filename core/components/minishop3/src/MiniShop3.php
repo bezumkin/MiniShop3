@@ -249,18 +249,23 @@ class MiniShop3
                 $response = $this->order->add(@$data['key'], @$data['value']);
                 break;
             case 'order/submit':
+                $this->order->initialize($token);
                 $response = $this->order->submit($data);
                 break;
             case 'order/getcost':
+                $this->order->initialize($token);
                 $response = $this->order->getCost();
                 break;
             case 'order/getrequired':
+                $this->order->initialize($token);
                 $response = $this->order->getDeliveryRequiresFields(@$data['id']);
                 break;
             case 'order/clean':
+                $this->order->initialize($token);
                 $response = $this->order->clean();
                 break;
             case 'order/get':
+                $this->order->initialize($token);
                 $response = $this->order->get();
                 break;
             default:

@@ -111,6 +111,8 @@ class Order implements OrderInterface
      */
     public function hasPayment($delivery, $payment)
     {
+        //TODO перенесен из ms2 - не используется, проверить
+        $this->modx->log(1, 'OrderController::hasPayment');
         $q = $this->modx->newQuery(msPayment::class, ['id' => $payment, 'active' => 1]);
         $q->innerJoin(
             msDeliveryMember::class,
@@ -124,49 +126,25 @@ class Order implements OrderInterface
     /**
      * Returns required fields for delivery
      *
-     * @param $id
+     * @param int $delivery_id
      *
      * @return array|string
      */
-    public function getDeliveryRequiresFields($deliveryId = 0)
+    public function getDeliveryRequiresFields(int $delivery_id = 0): array
     {
-        /** @var array $validationRules */
-        $validationRules = $this->getDeliveryValidationRules($deliveryId);
-        if (!$validationRules['success']) {
-            return $this->error('ms3_order_err_delivery', ['delivery']);
+        $response = $this->storage->getDeliveryValidationRules($delivery_id);
+        if (!$response['success']) {
+            if (isset($response['message'])) {
+                return $this->error($response['message'], ['delivery']);
+            } else {
+                return $this->error('ms3_order_err_delivery', ['delivery']);
+            }
         }
-
-        $requires = array_filter($validationRules['validation_rules'], function ($rules) {
+        $requires = array_filter($response['data']['validation_rules'], function ($rules) {
             return in_array('required', array_map('trim', explode("|", $rules)));
         }, ARRAY_FILTER_USE_BOTH);
 
         return $this->success('', ['requires' => $requires]);
-    }
-
-    /**
-     * Returns the validation rules for delivery
-     *
-     * @param integer $deliveryId
-     * @return void
-     */
-    public function getDeliveryValidationRules($deliveryId = 0)
-    {
-        if (empty($deliveryId)) {
-            // TODO: ждем реализации, чтобы корректно получать order
-            $deliveryId = $this->order['delivery_id'];
-        }
-        /** @var msDelivery $delivery */
-        $delivery = $this->modx->getObject(msDelivery::class, ['id' => $deliveryId, 'active' => 1]);
-        if (!$delivery) {
-            return $this->error('ms3_order_err_delivery', ['delivery']);
-        }
-
-        $rules = $delivery->get('validation_rules');
-        $rules = empty($rules)
-            ? []
-            : $this->modx->fromJSON($rules, true);
-
-        return $this->success('', ['validation_rules' => $rules]);
     }
 
     public function submit(): array
