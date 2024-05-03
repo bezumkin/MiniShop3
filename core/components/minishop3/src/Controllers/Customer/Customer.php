@@ -76,6 +76,8 @@ class Customer
         }
         $this->token = $token;
         $_SESSION['ms3']['customer_token'] = $token;
+        $lifetime = $this->modx->getOption('session_gc_maxlifetime', null, '604800') * 1000;
+        return $this->success('', compact('token', 'lifetime'));
     }
 
     public function registerValidation($rules = [], $messages = [])

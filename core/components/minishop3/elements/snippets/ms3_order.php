@@ -65,9 +65,10 @@ $leftJoin = [
 
 // Select columns
 $select = [];
+$includeDeliveryFields = $modx->getOption('includeDeliveryFields', $scriptProperties, 'id');
 if (!empty($scriptProperties['includeDeliveryFields'])) {
     $includeDeliveryKeys = array_map('trim', explode(',', $scriptProperties['includeDeliveryFields']));
-    $includeDeliveryKeys = array_merge($includeDeliveryKeys, ['id']);
+    $includeDeliveryKeys = array_unique(array_merge($includeDeliveryKeys, ['id']));
 
     if ($includeDeliveryKeys[0] === '*') {
         $select['msDelivery'] = $modx->getSelectColumns(msDelivery::class, '`msDelivery`', 'delivery_', ['id'], true);
@@ -83,7 +84,7 @@ if (!empty($scriptProperties['includeDeliveryFields'])) {
 
 if (!empty($scriptProperties['includePaymentFields'])) {
     $includePaymentKeys = array_map('trim', explode(',', $scriptProperties['includePaymentFields']));
-    $includePaymentKeys = array_merge($includePaymentKeys, ['id']);
+    $includePaymentKeys = array_unique(array_merge($includePaymentKeys, ['id']));
 
     if ($includePaymentKeys[0] === '*') {
         $select['msPayment'] = $modx->getSelectColumns(msPayment::class, '`msPayment`', 'payment_', ['id'], true);
@@ -160,20 +161,20 @@ if ($modx->user->isAuthenticated($modx->context->key)) {
     $profile = array_merge($modx->user->Profile->toArray(), $modx->user->toArray());
 }
 $fields = [
-    'receiver' => 'fullname',
-    'phone' => 'phone',
-    'email' => 'email',
-    'comment' => 'extended[comment]',
-    'index' => 'zip',
-    'country' => 'country',
-    'region' => 'state',
-    'city' => 'city',
-    'street' => 'address',
-    'building' => 'extended[building]',
-    'room' => 'extended[room]',
-    'entrance' => 'extended[entrance]',
-    'floor' => 'extended[floor]',
-    'text_address' => 'extended[address]',
+//    'receiver' => 'fullname',
+//    'phone' => 'phone',
+//    'email' => 'email',
+    'address_comment' => 'extended[comment]',
+    'address_index' => 'zip',
+    'address_country' => 'country',
+    'address_region' => 'state',
+    'address_city' => 'city',
+    'address_street' => 'address',
+    'address_building' => 'extended[building]',
+    'address_room' => 'extended[room]',
+    'address_entrance' => 'extended[entrance]',
+    'address_floor' => 'extended[floor]',
+    'address_text_address' => 'extended[address]',
 ];
 // Apply custom fields
 if (!empty($userFields)) {
@@ -207,10 +208,9 @@ foreach ($fields as $key => $value) {
     }
 }
 
-
 $outputData = [
     'order' => $order,
-//    'form' => $form,
+    'form' => $form,
     'deliveries' => $deliveries,
     'payments' => $payments,
 //    'errors' => $errors,
