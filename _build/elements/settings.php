@@ -216,6 +216,11 @@ return [
         'xtype' => 'combo-boolean',
         'area' => 'ms3_order',
     ],
+    'ms3_order_redirect_thanks_id' => [
+        'value' => 1,
+        'xtype' => 'numberfield',
+        'area' => 'ms3_order',
+    ],
     'ms3_date_format' => [
         'value' => 'd.m.y H:M',
         'xtype' => 'textfield',

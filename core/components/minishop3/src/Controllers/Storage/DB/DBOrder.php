@@ -10,6 +10,7 @@ use MiniShop3\Model\msPayment;
 use MODX\Revolution\modX;
 use MiniShop3\Controllers\Order\OrderInterface;
 use Rakit\Validation\Validator;
+use MiniShop3\Controllers\Order\OrderStatus;
 
 class DBOrder extends DBStorage implements OrderInterface
 {
@@ -51,7 +52,7 @@ class DBOrder extends DBStorage implements OrderInterface
         //TODO Добавить событие?
 //        $response = $this->invokeEvent('msOnBeforeGetOrder', [
 //            'draft' => $this->draft,
-//            'cart' => $this,
+//            'controller' => $this,
 //        ]);
 //        if (!($response['success'])) {
 //            return $this->error($response['message']);
@@ -62,7 +63,7 @@ class DBOrder extends DBStorage implements OrderInterface
 //        $response = $this->invokeEvent('msOnGetOrder, [
 //            'draft' => $this->draft,
 //            'data' => $this->order,
-//            'cart' => $this
+//            'controller' => $this,
 //        ]);
 //
 //        if (!$response['success']) {
@@ -93,13 +94,13 @@ class DBOrder extends DBStorage implements OrderInterface
         }
 
         $cost = 0;
-        $cart = [];
+        $status = [];
         $this->ms3->cart->initialize($this->ms3->config['ctx'], $this->token);
         $response = $this->ms3->cart->status();
         if ($response['success']) {
-            $cart = $response['data'];
+            $status = $response['data'];
             $cost = $with_cart
-                ? $cart['total_cost']
+                ? $status['total_cost']
                 : 0;
         }
 
@@ -112,7 +113,7 @@ class DBOrder extends DBStorage implements OrderInterface
             );
             if ($msDelivery) {
                 $cost = $msDelivery->getCost($this, $cost);
-                $delivery_cost = $cost - $cart['total_cost'];
+                $delivery_cost = $cost - $status['total_cost'];
                 $this->setDeliveryCost($delivery_cost);
             }
         }
@@ -143,18 +144,16 @@ class DBOrder extends DBStorage implements OrderInterface
         $delivery_cost = $response['data']['delivery_cost'];
 
         $data = $only_cost
-            ? $cost
-            : $this->success('', [
+            ? [
                 'cost' => $cost,
-                'cart_cost' => $cart['total_cost'],
-                'discount_cost' => $cart['total_discount'],
+            ]
+            : [
+                'cost' => $cost,
+                'cart_cost' => $status['total_cost'],
+                'discount_cost' => $status['total_discount'],
                 'delivery_cost' => $delivery_cost
-            ]);
-
-        return $this->success(
-            'ms3_order_getcost_success',
-            $data
-        );
+            ];
+        return $this->success('ms3_order_getcost_success', $data);
     }
 
     public function add(string $key, mixed $value = null): array
@@ -224,8 +223,10 @@ class DBOrder extends DBStorage implements OrderInterface
         if (!empty($this->order['delivery_id']) && empty($this->deliverValidationRules)) {
             $response = $this->getDeliveryValidationRules($this->order['delivery_id']);
             if (!empty($response['success'])) {
-                $this->deliverValidationRules = $response['validation_rules'];
-                $this->validationRules = array_merge($this->validationRules, $this->deliverValidationRules);
+                $this->deliverValidationRules = $response['data']['validation_rules'];
+                $this->validationRules = array_unique(
+                    array_merge($this->validationRules, $this->deliverValidationRules)
+                );
             }
         }
 
@@ -330,15 +331,143 @@ class DBOrder extends DBStorage implements OrderInterface
         return $this->success('ms3_order_set_success', $data);
     }
 
-    public function submit(): array
+    public function submit(array $data = []): array
     {
+        if (empty($this->token)) {
+            return $this->error('ms3_err_token');
+        }
+        $this->initDraft();
+
         if (empty($this->order)) {
             $response = $this->get();
             if ($response['success']) {
                 $this->order = $response['data']['order'];
             }
         }
-        return [];
+
+        $response = $this->ms3->utils->invokeEvent('msOnSubmitOrder', [
+            'data' => $data,
+            'controller' => $this,
+        ]);
+        if (!$response['success']) {
+            return $this->error($response['message']);
+        }
+        if (!empty($response['data']['data'])) {
+            $this->set($response['data']['data']);
+        }
+
+        $response = $this->getDeliveryRequiresFields();
+        if (!$response['success']) {
+            return $this->error($response['message']);
+        }
+        $requires = $response['data']['requires'];
+        $errors = [];
+        foreach ($requires as $k => $v) {
+            if (empty($this->order[$k]) && empty($this->order['address_' . $k])) {
+                $errors[] = $k;
+            }
+        }
+        if (!empty($errors)) {
+            return $this->error('ms3_order_err_requires', $errors);
+        }
+
+        //TODO Беру профиль msCustomer.  Но проверить, регистрируем ли пользователя?
+//        $user_id = $this->ms2->getCustomerId();
+        $user_id = 1;
+        if (empty($user_id) || !is_int($user_id)) {
+            return $this->error(is_string($user_id) ? $user_id : 'ms3_err_user_nf');
+        }
+        $this->ms3->cart->initialize($this->ctx, $this->token);
+        $response = $this->ms3->cart->status();
+        if (!$response['success']) {
+            return $this->error($response['message']);
+        }
+        $cart_status = $response['data'];
+        if (empty($cart_status['total_count'])) {
+            return $this->error('ms3_order_err_empty');
+        }
+
+        $response = $this->getCost(false, true);
+        if (!$response['success']) {
+            return $this->error($response['message']);
+        }
+        $delivery_cost = $response['data']['cost'];
+        $response = $this->getCost(true, true);
+        if (!$response['success']) {
+            return $this->error($response['message']);
+        }
+        $cart_cost = $response['data']['cost'] - $delivery_cost;
+
+        $num = $this->getNewOrderNum();
+
+        $this->draft->fromArray([
+            'user_id' => $user_id,
+            'updatedon' => time(),
+            'num' => $num,
+            'delivery_cost' => $delivery_cost,
+            'cost' => $cart_cost + $delivery_cost,
+        ]);
+
+        $this->draft->Address->fromArray([
+            'user_id' => $user_id,
+            'updatedon' => time(),
+        ]);
+        $this->draft->save();
+
+        $response = $this->ms3->utils->invokeEvent('msOnBeforeCreateOrder', [
+            'msOrder' => $this->draft,
+            'controller' => $this,
+        ]);
+        if (!$response['success']) {
+            return $this->error($response['message']);
+        }
+
+        $response = $this->ms3->utils->invokeEvent('msOnCreateOrder', [
+            'msOrder' => $this->draft,
+            'controller' => $this,
+        ]);
+
+        if (!$response['success']) {
+            return $this->error($response['message']);
+        }
+        if (empty($_SESSION['ms3']['orders'])) {
+            $_SESSION['ms3']['orders'] = [];
+        }
+        $_SESSION['ms3']['orders'][] = $this->draft->get('id');
+
+        // Trying to set status "new"
+        $status_new = $this->modx->getOption('ms3_status_new', null, 1);
+        $orderStatus = new OrderStatus($this->ms3);
+        $response = $orderStatus->change($this->draft->get('id'), $status_new);
+
+        if ($response !== true) {
+            return $this->error($response, ['msorder' => $this->draft->get('id')]);
+        }
+
+        // Reload order object after changes in changeOrderStatus method
+
+        /** @var msOrder $msOrder */
+        $msOrder = $this->modx->getObject(msOrder::class, ['id' => $this->draft->get('id')]);
+        $payment = $this->modx->getObject(
+            msPayment::class,
+            ['id' => $msOrder->get('payment_id'), 'active' => 1]
+        );
+        if (!$payment) {
+            return $this->success('', ['msorder' => $msOrder->get('id')]);
+        }
+
+        // TODO  редирект на конкретный ID страницы, заданный через системную настройку или сниппет.
+        $response = $payment->send($msOrder);
+        if (!$response['success']) {
+            return $this->error($response['message']);
+        }
+        if (!empty($response['data']['redirect'])) {
+            return $response;
+        }
+        $thanks_id = $this->modx->getOption('ms3_order_redirect_thanks_id', null, 1);
+        $redirect = $this->modx->makeUrl($thanks_id, $this->ctx, ['msorder' => $msOrder->get('id')]);
+        $response['data']['redirect'] = $redirect;
+        return $response;
     }
 
     public function clean(): array
@@ -410,13 +539,47 @@ class DBOrder extends DBStorage implements OrderInterface
         $q->stmt->execute();
         $rules = $q->stmt->fetch(\PDO::FETCH_COLUMN);
         if (empty($rules)) {
-            return [];
+            return $this->success('', ['validation_rules' => []]);
         }
         $rules = json_decode($rules, true);
         if (!is_array($rules)) {
-            return [];
+            return $this->success('', ['validation_rules' => []]);
         }
         return $this->success('', ['validation_rules' => $rules]);
+    }
+
+    /**
+     * Returns required fields for delivery
+     *
+     * @param int $delivery_id
+     *
+     * @return array
+     */
+    public function getDeliveryRequiresFields(int $delivery_id = 0): array
+    {
+        if (empty($delivery_id)) {
+            if (empty($this->order)) {
+                $response = $this->get();
+                if ($response['success']) {
+                    $this->order = $response['data']['order'];
+                }
+            }
+
+            $delivery_id = $this->order['delivery_id'];
+        }
+        $response = $this->getDeliveryValidationRules($delivery_id);
+        if (!$response['success']) {
+            if (isset($response['message'])) {
+                return $this->error($response['message'], ['delivery']);
+            } else {
+                return $this->error('ms3_order_err_delivery', ['delivery']);
+            }
+        }
+        $requires = array_filter($response['data']['validation_rules'], function ($rules) {
+            return in_array('required', array_map('trim', explode("|", $rules)));
+        }, ARRAY_FILTER_USE_BOTH);
+
+        return $this->success('', ['requires' => $requires]);
     }
 
     protected function getOrder()
@@ -460,5 +623,40 @@ class DBOrder extends DBStorage implements OrderInterface
         }
         // check msCustomer
         return false;
+    }
+
+    /**
+     * Return current number of order
+     *
+     * @return string
+     */
+    public function getNewOrderNum(): string
+    {
+        $format = htmlspecialchars($this->modx->getOption('ms3_order_format_num', null, 'ym'));
+        $separator = trim(
+            preg_replace(
+                "/[^,\/\-]/",
+                '',
+                $this->modx->getOption('ms3_order_format_num_separator', null, '/')
+            )
+        );
+        $separator = $separator ?: '/';
+
+        $cur = $format ? date($format) : date('ym');
+
+        $count = 0;
+
+        $c = $this->modx->newQuery(msOrder::class);
+        $c->where(['num:LIKE' => "{$cur}%"]);
+        $c->select('num');
+        $c->sortby('id', 'DESC');
+        $c->limit(1);
+        if ($c->prepare() && $c->stmt->execute()) {
+            $num = $c->stmt->fetchColumn();
+            [, $count] = explode($separator, $num);
+        }
+        $count = intval($count) + 1;
+
+        return sprintf('%s%s%d', $cur, $separator, $count);
     }
 }

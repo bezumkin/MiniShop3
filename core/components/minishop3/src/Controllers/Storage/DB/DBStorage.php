@@ -70,7 +70,7 @@ class DBStorage
         return $this->modx->getObject(msOrder::class, $where);
     }
 
-    protected function newDraft($token)
+    protected function newDraft($token): msOrder
     {
         $status_draft = $this->modx->getOption('ms3_status_draft', null, 1);
         /** @var msOrder $msOrder */
@@ -109,7 +109,7 @@ class DBStorage
      *
      * @return array|string
      */
-    protected function success(string $message = '', array $data = [], array $placeholders = [])
+    protected function success(string $message = '', array $data = [], array $placeholders = []): array|string
     {
         return $this->ms3->utils->success($message, $data, $placeholders);
     }
@@ -123,7 +123,7 @@ class DBStorage
      *
      * @return array|string
      */
-    protected function error(string $message = '', array $data = [], array $placeholders = [])
+    protected function error(string $message = '', array $data = [], array $placeholders = []): array|string
     {
         return $this->ms3->utils->error($message, $data, $placeholders);
     }
@@ -136,7 +136,7 @@ class DBStorage
      *
      * @return array|string
      */
-    protected function invokeEvent(string $eventName, array $params = [])
+    protected function invokeEvent(string $eventName, array $params = []): array|string
     {
         return $this->ms3->utils->invokeEvent($eventName, $params);
     }

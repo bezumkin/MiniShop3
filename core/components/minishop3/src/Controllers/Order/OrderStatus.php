@@ -43,16 +43,16 @@ class OrderStatus
     public function change($order_id, $status_id)
     {
         /** @var msOrder $order */
-        $order = $this->modx->getObject(msOrder::class, ['id' => $order_id], false);
-        if (!$order) {
+        $msOrder = $this->modx->getObject(msOrder::class, ['id' => $order_id]);
+        if (!$msOrder) {
             return $this->modx->lexicon('ms3_err_order_nf');
         }
 
-        $ctx = $order->get('context');
+        $ctx = $msOrder->get('context');
         $this->modx->switchContext($ctx);
         $this->ms3->initialize($ctx);
 
-        $error = '';
+
         /** @var msOrderStatus $status */
         $status = $this->modx->getObject(msOrderStatus::class, ['id' => $status_id, 'active' => 1]);
         if (!$status) {
@@ -61,7 +61,7 @@ class OrderStatus
         /** @var msOrderStatus $old_status */
         $old_status = $this->modx->getObject(
             msOrderStatus::class,
-            ['id' => $order->get('status_id'), 'active' => 1]
+            ['id' => $msOrder->get('status_id'), 'active' => 1]
         );
         if ($old_status) {
             if ($old_status->get('final')) {
@@ -74,60 +74,59 @@ class OrderStatus
             }
         }
 
-        if ($order->get('status_id') == $status_id) {
+        if ($msOrder->get('status_id') == $status_id) {
             return $this->modx->lexicon('ms3_err_status_same');
         }
 
         $eventParams = [
-            'msOrder' => $order,
-            'status_id' => $order->get('status_id'),
+            'msOrder' => $msOrder,
+            'status_id' => $msOrder->get('status_id'),
         ];
         $response = $this->ms3->utils->invokeEvent('msOnBeforeChangeOrderStatus', $eventParams);
         if (!$response['success']) {
             return $response['message'];
         }
 
-        $order->set('status_id', $status_id);
+        $msOrder->set('status_id', $status_id);
 
-        if ($order->save()) {
-            $this->orderLogController->process($order->get('id'), 'status', $status_id);
-            $response = $this->ms3->utils->invokeEvent('msOnChangeOrderStatus', [
-                'msOrder' => $order,
-                'status_id' => $status_id,
-            ]);
-            if (!$response['success']) {
-                return $response['message'];
-            }
-            $lang = $this->modx->getOption('cultureKey', null, 'en', true);
-            $tmp = $this->modx->getObject(
-                modUserSetting::class,
-                ['key' => 'cultureKey', 'user' => $order->get('user_id')]
-            );
-            if ($tmp) {
-                $lang = $tmp->get('value');
-            } else {
-                $tmp = $this->modx->getObject(
-                    modContextSetting::class,
-                    ['key' => 'cultureKey', 'context_key' => $order->get('context')]
-                );
-                if ($tmp) {
-                    $lang = $tmp->get('value');
-                }
-            }
-
-            $this->modx->setOption('cultureKey', $lang);
-            $this->modx->lexicon->load($lang . ':minishop3:default', $lang . ':minishop3:cart');
-
-            $this->sendEmails($order, $status);
+        if ($msOrder->save()) {
+//            $this->orderLogController->process($msOrder->get('id'), 'status', $status_id);
+//            $response = $this->ms3->utils->invokeEvent('msOnChangeOrderStatus', [
+//                'msOrder' => $msOrder,
+//                'status_id' => $status_id,
+//            ]);
+//            if (!$response['success']) {
+//                return $response['message'];
+//            }
+//            $lang = $this->modx->getOption('cultureKey', null, 'en', true);
+//            $tmp = $this->modx->getObject(
+//                modUserSetting::class,
+//                ['key' => 'cultureKey', 'user' => $msOrder->get('user_id')]
+//            );
+//            if ($tmp) {
+//                $lang = $tmp->get('value');
+//            } else {
+//                $tmp = $this->modx->getObject(
+//                    modContextSetting::class,
+//                    ['key' => 'cultureKey', 'context_key' => $msOrder->get('context')]
+//                );
+//                if ($tmp) {
+//                    $lang = $tmp->get('value');
+//                }
+//            }
+//
+//            $this->modx->setOption('cultureKey', $lang);
+//            $this->modx->lexicon->load($lang . ':minishop3:default', $lang . ':minishop3:cart');
+            //$this->sendEmails($msOrder, $status);
         }
 
         return true;
     }
 
-    private function sendEmails($order, $status)
+    private function sendEmails($msOrder, $status)
     {
         $tv_list = $this->modx->getOption('ms3_order_tv_list', null, '');
-        $pls = $order->toArray();
+        $pls = $msOrder->toArray();
         $pls['cost'] = $this->ms3->format->price($pls['cost']);
         $pls['cart_cost'] = $this->ms3->format->price($pls['cart_cost']);
         $pls['delivery_cost'] = $this->ms3->format->price($pls['delivery_cost']);
@@ -136,16 +135,16 @@ class OrderStatus
         if (!empty($tv_list)) {
             $pls['includeTVs'] = $tv_list;
         }
-        $payment = $order->getOne('Payment');
+        $payment = $msOrder->getOne('Payment');
         if ($payment) {
             $class = $payment->get('class');
             if (!empty($class)) {
                 $this->ms3->loadCustomClasses('payment');
                 if (class_exists($class)) {
                     /** @var Payment $controller */
-                    $controller = new $class($order);
+                    $controller = new $class($msOrder);
                     if (method_exists($controller, 'getPaymentLink')) {
-                        $link = $controller->getPaymentLink($order);
+                        $link = $controller->getPaymentLink($msOrder);
                         $pls['payment_link'] = $link;
                     }
                 }

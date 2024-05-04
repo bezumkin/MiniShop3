@@ -76,7 +76,7 @@ class Order implements OrderInterface
      *
      * @return bool|mixed|string
      */
-    public function validate($key, $value): mixed
+    public function validate(string $key, $value): mixed
     {
         return $this->storage->validate($key, $value);
     }
@@ -132,24 +132,12 @@ class Order implements OrderInterface
      */
     public function getDeliveryRequiresFields(int $delivery_id = 0): array
     {
-        $response = $this->storage->getDeliveryValidationRules($delivery_id);
-        if (!$response['success']) {
-            if (isset($response['message'])) {
-                return $this->error($response['message'], ['delivery']);
-            } else {
-                return $this->error('ms3_order_err_delivery', ['delivery']);
-            }
-        }
-        $requires = array_filter($response['data']['validation_rules'], function ($rules) {
-            return in_array('required', array_map('trim', explode("|", $rules)));
-        }, ARRAY_FILTER_USE_BOTH);
-
-        return $this->success('', ['requires' => $requires]);
+        return $this->storage->getDeliveryRequiresFields($delivery_id);
     }
 
-    public function submit(): array
+    public function submit(array $data = []): array
     {
-        return [];
+        return $this->storage->submit();
     }
 
     public function clean(): array
@@ -158,38 +146,12 @@ class Order implements OrderInterface
     }
 
     /**
-     * Return current number of order
-     *
+     * Returns number for new order
      * @return string
      */
-    protected function getNum()
+    public function getNewOrderNum(): string
     {
-        $format = htmlspecialchars($this->modx->getOption('ms3_order_format_num', null, 'ym'));
-        $separator = trim(
-            preg_replace(
-                "/[^,\/\-]/",
-                '',
-                $this->modx->getOption('ms3_order_format_num_separator', null, '/')
-            )
-        );
-        $separator = $separator ?: '/';
-
-        $cur = $format ? date($format) : date('ym');
-
-        $count = $num = 0;
-
-        $c = $this->modx->newQuery(msOrder::class);
-        $c->where(['num:LIKE' => "{$cur}%"]);
-        $c->select('num');
-        $c->sortby('id', 'DESC');
-        $c->limit(1);
-        if ($c->prepare() && $c->stmt->execute()) {
-            $num = $c->stmt->fetchColumn();
-            [, $count] = explode($separator, $num);
-        }
-        $count = intval($count) + 1;
-
-        return sprintf('%s%s%d', $cur, $separator, $count);
+        return $this->storage->getNewOrderNum();
     }
 
     /**
@@ -201,7 +163,7 @@ class Order implements OrderInterface
      *
      * @return array|string
      */
-    protected function error($message = '', $data = [], $placeholders = [])
+    protected function error(string $message = '', array $data = [], array $placeholders = []): array|string
     {
         return $this->ms3->utils->error($message, $data, $placeholders);
     }
@@ -215,7 +177,7 @@ class Order implements OrderInterface
      *
      * @return array|string
      */
-    protected function success($message = '', $data = [], $placeholders = [])
+    protected function success(string $message = '', array $data = [], array $placeholders = []): array|string
     {
         return $this->ms3->utils->success($message, $data, $placeholders);
     }
@@ -228,7 +190,7 @@ class Order implements OrderInterface
      *
      * @return array|string
      */
-    protected function invokeEvent(string $eventName, array $params = [])
+    protected function invokeEvent(string $eventName, array $params = []): array|string
     {
         return $this->ms3->utils->invokeEvent($eventName, $params);
     }
