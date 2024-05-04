@@ -40,9 +40,9 @@ if (!empty($_GET['msorder'])) {
 $response = $ms3->order->getCost();
 if ($response['success']) {
     $cost = $response['data'];
-    $order['cost'] = $ms3->format->price($cost['data']['cost']);
-    $order['cart_cost'] = $ms3->format->price($cost['data']['cart_cost']);
-    $order['delivery_cost'] = $ms3->format->price($cost['data']['delivery_cost']);
+    $order['cost'] = $ms3->format->price($cost['cost']);
+    $order['cart_cost'] = $ms3->format->price($cost['cart_cost']);
+    $order['delivery_cost'] = $ms3->format->price($cost['delivery_cost']);
     $order['discount_cost'] = $ms3->format->price($cost['discount_cost']);
 }
 
@@ -66,20 +66,18 @@ $leftJoin = [
 // Select columns
 $select = [];
 $includeDeliveryFields = $modx->getOption('includeDeliveryFields', $scriptProperties, 'id');
-if (!empty($scriptProperties['includeDeliveryFields'])) {
-    $includeDeliveryKeys = array_map('trim', explode(',', $scriptProperties['includeDeliveryFields']));
-    $includeDeliveryKeys = array_unique(array_merge($includeDeliveryKeys, ['id']));
+$includeDeliveryKeys = array_map('trim', explode(',', $includeDeliveryFields));
+$includeDeliveryKeys = array_unique(array_merge($includeDeliveryKeys, ['id']));
 
-    if ($includeDeliveryKeys[0] === '*') {
-        $select['msDelivery'] = $modx->getSelectColumns(msDelivery::class, '`msDelivery`', 'delivery_', ['id'], true);
-    } else {
-        $select['msDelivery'] = $modx->getSelectColumns(
-            msDelivery::class,
-            '`msDelivery`',
-            'delivery_',
-            $includeDeliveryKeys
-        );
-    }
+if ($includeDeliveryKeys[0] === '*') {
+    $select['msDelivery'] = $modx->getSelectColumns(msDelivery::class, '`msDelivery`', 'delivery_', ['id'], true);
+} else {
+    $select['msDelivery'] = $modx->getSelectColumns(
+        msDelivery::class,
+        '`msDelivery`',
+        'delivery_',
+        $includeDeliveryKeys
+    );
 }
 
 if (!empty($scriptProperties['includePaymentFields'])) {
@@ -134,7 +132,7 @@ foreach ($rows as $row) {
     $delivery = [];
     $payment = [];
     foreach ($row as $key => $value) {
-        if (strpos($key, 'delivery_') === 0) {
+        if (str_starts_with($key, 'delivery_')) {
             $delivery[substr($key, 9)] = $value;
         } else {
             $payment[substr($key, 8)] = $value;
