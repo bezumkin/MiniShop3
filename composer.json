@@ -1,0 +1,21 @@
+{
+  "name": "modx-pro/minishop3",
+  "type": "library",
+  "description": "Simple online shop for MODX 3",
+  "autoload": {
+    "psr-4": {
+      "ModxPro\\MiniShop3\\": "core/src/"
+    }
+  },
+  "bin": [
+    "bin/minishop3"
+  ],
+  "require": {
+    "php": ">=8.1",
+    "modx-pro/pdotools": "dev-3x-new",
+    "rakit/validation": "^1.4"
+  },
+  "require-dev": {
+    "modx/revolution": "^3.0"
+  }
+}

@@ -1,8 +1,5 @@
-node_modules
-config.core.php
-sftp-config.json
-.idea
-.DS_Store
-tests/properties.inc.php
-package-lock.json
-core/components/minishop3/vendor
+/.idea
+/assets/node_modules
+/assets/package-lock.json
+/assets/yarn.lock
+/vendor
